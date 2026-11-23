@@ -1,36 +1,54 @@
 # Personal Finance Manager
 
-A small, working demo app for managing one person's money: spending, budgets, savings goals, and mock investments. It was built as a portfolio project to show a full-stack workflow — Spring Boot on the back end, React + TypeScript on the front end — with real validation, tests, and a clean, readable codebase.
+I built this to practice a full-stack flow end to end: a Spring Boot backend, a React frontend, and a database in between. It tracks one person's money for a month: income and spending, budgets per category, savings goals, and a few mock investments. Nothing here is real. The data is made up, the prices are fixed mock values, and it is not connected to any bank or employer.
 
-**All data is synthetic demo data.** There are no real people, accounts, or market prices in this project, and nothing here is connected to any employer or real financial system.
+## What it does
 
-## Features
+- Dashboard: income, expenses, net for the month, spending by category, budget usage, goal progress, and portfolio totals.
+- Transactions: add and delete income/expense entries. Adding one updates the account balance.
+- Budgets: one monthly budget per spending category, with spent vs budget and what is left.
+- Savings goals: progress toward a target, capped at 100%, and you can add contributions.
+- Investments: holdings with shares, buy price, and a mock current price, so profit/loss is calculated, never fetched live.
+- Login: one demo user with a JWT. Every `/api/**` endpoint except login needs the token.
 
-- **Dashboard** — monthly income, expenses, and net; spending by category; budget usage; savings-goal progress; portfolio totals.
-- **Transactions** — list, add (with validation), and delete income/expense transactions. Account balances move with each transaction.
-- **Budgets** — a monthly budget per spending category, with spent vs. budget and remaining amounts.
-- **Savings goals** — track progress toward a target (capped at 100%) and add contributions.
-- **Investments** — mock holdings with shares, purchase price, and a fixed mock current price, so profit/loss is computed, never fetched live.
-- **Login** — demo JWT login (one demo user). Every `/api/**` endpoint except login requires a token.
+## Screenshots
+
+![Login](docs/screenshots/login.png)
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+![Transactions](docs/screenshots/transactions.png)
+
+![Budgets](docs/screenshots/budgets.png)
+
+![Goals](docs/screenshots/goals.png)
+
+![Investments](docs/screenshots/investments.png)
+
+## How I built it
+
+Backend first: JPA entities and repositories, then the service layer that does the monthly math (totals, spending by category, budget usage, goal percentages, portfolio profit/loss). The controllers are thin and the service holds the logic, which made it easy to unit test with mocked repositories.
+
+One bug I actually hit while testing: budget usage grouped transactions by category id, and that crashed with a null key when a category had no id yet. I changed it to group by category name and to skip transactions with no category. The tests for that are in `FinanceServiceTest`.
+
+Security is simple on purpose: Spring Security with a JWT filter, one demo user in config, BCrypt for the demo password, stateless sessions. The frontend is Vite + React + TypeScript, no component libraries, plain CSS. API calls go through the Vite proxy to the backend in development.
 
 ## Tech stack
 
-- **Backend:** Java 21, Spring Boot 3, Spring Web, Spring Data JPA, Spring Security (JWT), Bean Validation, H2 in-memory database, JUnit 5 + Mockito.
-- **Frontend:** Vite, React 18, TypeScript. No paid libraries. API calls are proxied to the backend in development.
-- **Data:** `schema.sql` + `data.sql` seed the demo month (November 2026) on startup. The database resets when the backend restarts.
+- Backend: Java 21, Spring Boot 3, Spring Web, Spring Data JPA, Spring Security (JWT), Bean Validation, H2 in-memory database, JUnit 5 + Mockito.
+- Frontend: Vite, React 18, TypeScript.
+- Data: `schema.sql` + `data.sql` seed a demo month (November 2026) on startup. The database resets when the backend restarts.
 
 ## How to run
 
-### Backend (port 8080)
+Backend (port 8080):
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-### Frontend (port 5173)
-
-In a second terminal:
+Frontend (port 5173):
 
 ```bash
 cd frontend
@@ -38,59 +56,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and sign in with the demo login below. The frontend proxies `/api` calls to `http://localhost:8080`.
+Demo login: `demo@finance.local` / `demo1234`. The demo JWT secret and demo password live in `application.properties` and are demo-only. Do not reuse them anywhere real.
 
-### Demo login
-
-- Email: `demo@finance.local`
-- Password: `demo1234`
-
-### Run the tests / production build
+## Tests
 
 ```bash
-cd backend && mvn test
-cd frontend && npm run build
+cd backend
+mvn test
 ```
 
-## Example API calls
-
-```bash
-# 1. Log in and save the token
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"demo@finance.local","password":"demo1234"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
-
-# 2. Monthly summary (defaults to November 2026, the seeded demo month)
-curl -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/summary?month=11&year=2026"
-
-# 3. Add a transaction
-curl -s -X POST http://localhost:8080/api/transactions \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"accountId":1,"categoryId":3,"amount":25.50,"date":"2026-11-20","description":"Groceries (demo)","type":"EXPENSE"}'
-```
-
-Other endpoints: `GET /api/accounts`, `GET /api/categories`, `GET /api/transactions`, `GET /api/budgets`, `GET /api/goals`, `POST /api/goals/{id}/contribute`, `GET /api/holdings`.
-
-## Architecture notes
-
-```
-frontend (React + TypeScript)
-    |  REST / JSON, JWT in the Authorization header
-backend (Spring Boot)
-    |  FinanceService — summary, budget usage, goal progress, portfolio P&L
-    |  JPA repositories — Account, Category, Transaction, Budget, SavingsGoal, Holding
-    v
-H2 in-memory database (seeded by schema.sql / data.sql)
-```
-
-- Controllers are thin: they validate input and delegate to `FinanceService`.
-- The calculations that matter (budget usage, goal progress, portfolio profit/loss, monthly totals) live in `FinanceService` and are covered by unit tests in `FinanceServiceTest`.
-- Security is deliberately simple for a demo: one in-memory demo user, stateless JWT, no sessions. Do not reuse the demo secret or credentials in a real app.
-
-## Screenshots
-
-_Screenshots to be added after the first run — the dashboard, transactions, and goals views._
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+6 tests: finance service calculations and JWT creation/validation.
